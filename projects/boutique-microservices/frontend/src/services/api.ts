@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+// Relative by default: nginx in front of the app forwards /api to the gateway,
+// so the same build works locally, through a load balancer, or any domain.
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
