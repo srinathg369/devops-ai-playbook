@@ -23,6 +23,12 @@ spec:
               echo "Restoring dump..."
               psql -h boutique-postgres -U postgres -f /dump/boutique_full.sql
 
+              # The dump has no users_db. user-service creates its own
+              # tables, so it only needs the empty database.
+              echo "Creating users_db..."
+              echo "SELECT 'CREATE DATABASE users_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'users_db')\gexec" | \
+                psql -h boutique-postgres -U postgres
+
               echo "Creating auth_db schema..."
               psql -h boutique-postgres -U postgres -d auth_db -c "
               CREATE TABLE IF NOT EXISTS users (
