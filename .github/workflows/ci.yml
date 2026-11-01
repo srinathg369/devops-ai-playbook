@@ -74,16 +74,27 @@ jobs:
 
       - name: Update image tags in k8s manifests
         run: |
+          set -euo pipefail
           NEW_TAG=${{ github.sha }}
-          ACCOUNT=${{ secrets.AWS_ACCOUNT_ID }}
-          REGION=${{ secrets.AWS_REGION }}
+          REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+
+          # Rewrite the whole image line, whatever registry or tag it had
+          # before (e.g. a <AWS_ACCOUNT_ID> placeholder or an old region).
+          # Matching "/<service>:" keeps "orders" and "order-service" apart.
+          update_image() {
+            local service=$1 manifest=$2
+            sed -i "s|\(image: *\).*/${service}:.*|\1${REGISTRY}/${service}:${NEW_TAG}|" "$manifest"
+            if ! grep -q "image: *${REGISTRY}/${service}:${NEW_TAG}$" "$manifest"; then
+              echo "::error::Image for ${service} was not updated in ${manifest}"
+              exit 1
+            fi
+            echo "Updated ${service} in ${manifest}"
+          }
 
           for SERVICE in auth gateway orders order-service product-service user-service; do
-            MANIFEST="gitops/k8s/backend/${SERVICE}.yml"
-            sed -i "s|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${SERVICE}:.*|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${SERVICE}:${NEW_TAG}|g" $MANIFEST
+            update_image "$SERVICE" "gitops/k8s/backend/${SERVICE}.yml"
           done
-
-          sed -i "s|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/frontend:.*|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/frontend:${NEW_TAG}|g" gitops/k8s/frontend/deployment.yml
+          update_image frontend gitops/k8s/frontend/deployment.yml
 
       - name: Commit and push updated manifests
         run: |
